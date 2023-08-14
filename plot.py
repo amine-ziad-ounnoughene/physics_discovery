@@ -5,21 +5,21 @@ import numpy as np
 import torch
 from scipy.ndimage import gaussian_filter
 
-scinet = SciNet(100,1,3,64)
-scinet.load_state_dict(torch.load("trained_models/scinet1.dat"))
 
-size = 100
-neuron_activation = [np.zeros((size,size)),np.zeros((size,size)),np.zeros((size,size))]
-
+t_size = 80
+size = 150
 t_max = 5
-t = np.linspace(0, t_max, size)
-min_fr, max_fr = 0, 5
+scinet = SciNet(t_size,1,3,100)
+scinet.load_state_dict(torch.load("trained_models/scinet1.dat"))
+neuron_activation = [np.zeros((size,size)),np.zeros((size,size)),np.zeros((size,size)), np.zeros((size,size))]
+t = np.linspace(0, t_max, t_size)
+min_fr, max_fr = 0.01, 100
 fr = np.random.uniform(min_fr, max_fr, size)
 start_st, end_st = 0.01, 100
 st = np.logspace(np.log10(start_st), np.log10(end_st), size, endpoint = True)
 
 def f(t, st, fr):
-    return st**2 * fr * (1 - t/st - np.exp(-t/st))
+    return t + st**2 + fr **2
 
 for ist, st_ in enumerate(st):
     for ifr, fr_ in enumerate(fr):
@@ -28,6 +28,7 @@ for ist, st_ in enumerate(st):
         example.append(t_pred)
 
         example_tensor = torch.Tensor([example]).reshape(1, -1)
+
         results = scinet.forward(example_tensor)
 
         latent_layer = scinet.mu.detach().numpy()[0]
@@ -38,15 +39,13 @@ for ist, st_ in enumerate(st):
 
 sigma = 1.0  # Adjust the sigma value for desired smoothing strength
 
-smoothed_activation = [gaussian_filter(layer, sigma) for layer in neuron_activation]
+#smoothed_activation = [gaussian_filter(layer, sigma) for layer in neuron_activation]
+smoothed_activation = neuron_activation
 
 fig = plt.figure(figsize=(20,10))
 for i in range(3):
     ax = fig.add_subplot(1, 3, 1+i, projection='3d')
     
-    fr = np.random.uniform(min_fr, max_fr, size)
-    st = np.logspace(np.log10(start_st), np.log10(end_st), size, endpoint = True)
-
     plt.figure()
     plt.plot(fr,smoothed_activation[i])
     plt.xlabel("fr")
