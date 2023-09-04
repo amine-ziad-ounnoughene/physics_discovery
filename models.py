@@ -15,19 +15,16 @@ class SciNet(nn.Module):
 		"""
 		super(SciNet, self).__init__()
 		self.latent_dim = latent_dim
-		self.enc1 = nn.Linear(input_dim, layer_dim*4)
-		self.enc2 = nn.Linear(layer_dim*4, layer_dim*2)
-		self.enc3 = nn.Linear(layer_dim*2, layer_dim)
-		self.latent = nn.Linear(layer_dim, latent_dim*2)
-		self.dec1 = nn.Linear(latent_dim+1, layer_dim)
-		self.dec2 = nn.Linear(layer_dim,layer_dim*2)
-		self.dec3 = nn.Linear(layer_dim*2,layer_dim)
-		self.out = nn.Linear(layer_dim, output_dim)
+		self.enc1 = nn.Linear(input_dim, 500)
+		self.enc2 = nn.Linear(500, 100)
+		self.latent = nn.Linear(100, latent_dim*2)
+		self.dec1 = nn.Linear(latent_dim+1, 100)
+		self.dec2 = nn.Linear(100,100)
+		self.out = nn.Linear(100, output_dim)
 		
 	def encoder(self, x):
 		z = F.relu(self.enc1(x))
 		z = F.relu(self.enc2(z))
-		z = F.relu(self.enc3(z))
 		z = self.latent(z)
 		self.mu = z[:, 0:self.latent_dim]
 		self.sigma = z[:, self.latent_dim:]
@@ -45,7 +42,6 @@ class SciNet(nn.Module):
 	def decoder(self, z):
 		x = F.relu(self.dec1(z))
 		x = F.relu(self.dec2(x))    
-		x = F.relu(self.dec3(x))        
 		return self.out(x)
 
 	def forward(self, obs):
