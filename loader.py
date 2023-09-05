@@ -15,7 +15,7 @@ class CustomTimeSeriesDataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-
+        print(self.size)
         time_series = self.data_frame.iloc[idx, 1:self.size+1].values.astype('float32')
         fr_feature = self.data_frame.iloc[idx, -4].astype('float32')
         st_feature = self.data_frame.iloc[idx, -3].astype('float32')
@@ -35,7 +35,7 @@ class CustomTimeSeriesDataset(Dataset):
 
         return sample
 
-def build_dataloader(batch_size = 32, size = 100):
+def build_dataloader(size, batch_size = 32):
     # DataLoader example
     csv_file_path = 'data.csv'
     custom_dataset = CustomTimeSeriesDataset(csv_file_path, size)
@@ -43,7 +43,7 @@ def build_dataloader(batch_size = 32, size = 100):
 
     return data_loader
 
-if __name__ == "__main__":
+'''if __name__ == "__main__":
     # Assuming you have 'data.csv' in the current directory
     csv_file_path = 'data.csv'
     size = 100
@@ -58,4 +58,4 @@ if __name__ == "__main__":
     answer = sample['answer']
 
     print("question:", question)
-    print("answer:", answer)
+    print("answer:", answer)'''
