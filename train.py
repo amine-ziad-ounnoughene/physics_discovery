@@ -1,123 +1,54 @@
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
-import pandas as pd
-import json
-import os
-import numpy as np
-from models import SciNet
-from utils import target_loss
-from loader import build_dataloader
+from tools import *
+def prepare_data_loaders(dataset, n_equation, batch_size=50, equation_size=30):
+    x_train, y_train = data_prep(dataset, "train", n_equation, equation_size)
+    labels_train = standardize_tensor(torch.tensor(y_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+    features_train = standardize_tensor(torch.tensor(x_train, dtype=torch.float32), labels_train)
+    train_dataset = TensorDataset(features_train, labels_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-def generate_data(size, size_, t_max):
-    t = np.linspace(0, t_max, size)
-    min_fr, max_fr = 0.01, 100
-    fr = np.linspace(min_fr, max_fr, size_)
-    start_st, end_st = 0.01, 100
-    st = np.logspace(np.log10(start_st), np.log10(end_st), size_, endpoint=True)
+    x_test, y_test = data_prep(dataset, "test", n_equation, equation_size)
+    labels_test = standardize_tensor(torch.tensor(y_test, dtype=torch.float32), labels_train)
+    features_test = standardize_tensor(torch.tensor(x_test, dtype=torch.float32), labels_test)
+    test_dataset = TensorDataset(features_test, labels_test)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-    def f(t, st, fr):
-        return st**2 * fr * (1 - t/st - np.exp(-t/st))
+    return train_loader, test_loader, features_train, labels_train, features_test, labels_test
 
-    data = []
-    for st_ in st:
-        for fr_ in fr:
-            example = list(f(t, st_, fr_))
-            t_pred = np.random.uniform(0, t_max)
-            pred = f(t_pred, st_, fr_)
-            example.extend([fr_, st_, t_pred, pred])
-            data.append(example)
-
-    columns = [str(i) for i in range(size)]
-    columns.extend(["fr", "st", "t_pred", "pred"])
-    df = pd.DataFrame(data, columns=columns)
-    return df
-
-def train_sci_net(scinet, dataloader, optimizer, scheduler, beta, N_EPOCHS, device):
-    hist_error = []
-    hist_kl = []
-    hist_loss = []
-
-    for epoch in range(N_EPOCHS):
-        epoch_error = []
-        epoch_kl = []
-        epoch_loss = []
-        for minibatch in dataloader:
-            time_series, fr, st, question, answer = (
-                minibatch['time_series'].to(device) / 5,
-                minibatch['fr'].to(device) / 5,
-                minibatch['st'].to(device) / 5,
-                minibatch['question'].to(device) / 5,
-                minibatch['answer'].to(device) / 5
-            )
-            inputs = torch.cat((time_series, question.view(-1, 1)), 1)
-            outputs = answer
-
+def train_model(model, train_loader, test_loader, optimizer, criterion, scheduler, num_epochs):
+    hist_train_loss = []
+    hist_test_loss = []
+    for epoch in range(num_epochs):
+        losses = []
+        w_losses = []
+        for batch_features, batch_labels in train_loader:
+            batch_features = batch_features.to(device)
+            batch_labels = batch_labels.to(device)
             optimizer.zero_grad()
-            pred = scinet.forward(inputs)
-            loss_ = target_loss(pred, outputs)
-            kl = beta * scinet.kl_loss
-            loss = loss_ + kl
-            loss.backward()
+            output, formula = model(batch_features)
+            loss = criterion(output.squeeze(1).requires_grad_(), batch_labels)
+            w_loss = loss
+            losses.append(loss)
+            w_losses.append(w_loss)
+            w_loss.backward()
             optimizer.step()
-            error = torch.mean(torch.sqrt((pred[:, 0] - outputs)**2)).detach().cpu().numpy()
-            epoch_error.append(float(error))
-            epoch_kl.append(float(kl.data.detach().cpu().numpy()))
-            epoch_loss.append(float(loss_.data.detach().cpu().numpy()))
+            scheduler.step()
+        
+        with torch.no_grad():
+            test_losses = []
+            for batch_features, batch_labels in test_loader:
+                batch_features = batch_features.to(device)
+                batch_labels = batch_labels.to(device)
+                output, formula = model(batch_features)
+                test_loss = criterion(output.squeeze(1).requires_grad_(), batch_labels)
+                test_losses.append(test_loss.item())
+            avg_test_loss = sum(test_losses) / len(test_losses)
 
-        hist_error.append(np.mean(epoch_error))
-        hist_loss.append(np.mean(epoch_loss))
-        hist_kl.append(np.mean(epoch_kl))
+        avg_train_loss = sum(losses) / len(losses)
+        hist_train_loss.append(avg_train_loss)
+        hist_test_loss.append(avg_test_loss)
+        print(f"EPOCH[{epoch}] test loss: {avg_test_loss:.6f}, train loss: {avg_train_loss:.6f}, weighted_loss: {sum(w_losses) / len(w_losses):.6f}")
 
-        before_lr = optimizer.param_groups[0]["lr"]
-        scheduler.step()
-        after_lr = optimizer.param_groups[0]["lr"]
-        print("Epoch %d: SGD lr %.6f -> %.6f" % (epoch+1, before_lr, after_lr))
-        print("Epoch %d -- loss %f, RMS error %f, KL %f" % (epoch+1, hist_loss[-1], hist_error[-1], hist_kl[-1]))
-
-    return hist_error, hist_kl, hist_loss
-
-def main():
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    sizes = [5, 10, 25, 50, 100, 150, 200, 300]
-    N_EPOCHS = 150  
-    size_ = 200
-    t_max = 5
-    data_file = "data.csv"
-    log_file = "log.json"
-
-    os.remove(log_file)
-    with open(log_file, "w") as f:
-        json.dump({"runs": []}, f)
-
-    for size in sizes: 
-        df = generate_data(size, size_, t_max)
-        df.to_csv(data_file)
-
-        scinet = SciNet(size, 1, 3, 100).to(device)  # Move the model to the GPU
-        dataloader = build_dataloader(size=size, batch_size=128)
-
-        SAVE_PATH = f"trained_models/scinet1-{size}epoch{N_EPOCHS}.dat"
-        optimizer = optim.Adam(scinet.parameters(), lr=0.001)
-
-        hist_error, hist_kl, hist_loss = train_sci_net(scinet, dataloader, optimizer, lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.009, total_iters=N_EPOCHS), 0.5, N_EPOCHS, device)
-
-        torch.save(scinet.state_dict(), SAVE_PATH)
-        print(f"Model saved to {SAVE_PATH}")
-
-        with open(log_file, "r") as json_file:
-            loaded_data = json.load(json_file)["runs"]
-
-        loaded_data.append({
-            "epochs": N_EPOCHS,
-            "size": size,
-            "kl": hist_kl,
-            "RMSE": hist_error,
-            "loss": hist_loss
-        })
-
-        with open(log_file, "w") as json_file:
-            json.dump({"runs": loaded_data}, json_file)
-
-if __name__ == "__main__":
-    main()
+    return hist_train_loss, hist_test_loss
