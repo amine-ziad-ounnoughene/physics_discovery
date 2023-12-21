@@ -13,11 +13,13 @@ operators_bin = ["+", "-", "*", "/"]
 
 
 def standardize_tensor(input_tensor, reference_tensor):
-    mean = torch.mean(reference_tensor)
-    std = torch.std(reference_tensor)
-    standardized_tensor = (input_tensor - mean) / (std + 1e-8)  # Adding a small value to avoid division by zero
+    min_val = torch.min(reference_tensor)
+    max_val = torch.max(reference_tensor)
+    
+    normalized_tensor = (input_tensor - min_val) / (max_val - min_val + 1e-6)
     
     return input_tensor
+
 def decode(formula, x):
     for i in range(len(formula)):
         out = torch.Tensor([]).to(device)
@@ -97,7 +99,7 @@ def bin_(op, x):
     if len(op) == 3:
         a, op, b = op[0], op[1], op[2]
         if op == "/":
-            return x[:, a] / (x[:, b] + (x[:, b] / torch.abs(x[:, b]) * 0.001))
+            return x[:, a] / (x[:, b] + (x[:, b] / torch.abs(x[:, b]) * 1e-6))
         elif op == "+":
             return x[:, a] + x[:, b]
         elif op == "*":
@@ -157,7 +159,26 @@ def split_vector(vector, shape):
         result.append(vector[start_index:end_index])
         start_index = end_index
     return result
+def real_grad(x):
+    with torch.enable_grad():
+        x = x.clone().detach().requires_grad_(True)
+        # Perform the operation
+        A = x[:, 0] * x[:, 1]
 
+    # Create a new tensor for backpropagation with gradients
+    gradient_tensor = torch.ones_like(A, requires_grad=True)
+
+    # Perform backward pass with respect to A using the new tensor
+    A.backward(gradient_tensor, retain_graph=True)
+
+    # The gradient of A with respect to C
+    grad_ = x.grad
+    return grad_
+def compute_gradient_last_to_first(model, input_data):
+    input_data.requires_grad = True  # Set requires_grad to True to compute gradients
+    output, _ = model(input_data)
+    gradient = torch.autograd.grad(outputs=output, inputs=input_data, grad_outputs=torch.ones_like(output), retain_graph=True)[0]
+    return gradient
 def importance(B, C):
     with torch.enable_grad():
         C = C.clone().detach().requires_grad_(True)

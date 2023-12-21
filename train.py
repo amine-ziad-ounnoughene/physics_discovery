@@ -28,8 +28,11 @@ def train_model(model, train_loader, test_loader, optimizer, criterion, schedule
             batch_labels = batch_labels.to(device)
             optimizer.zero_grad()
             output, formula = model(batch_features)
+            real_grad_ = real_grad(batch_features)
+            fake_grad_ = compute_gradient_last_to_first(model, batch_features)
+            grad_loss = criterion(real_grad_, fake_grad_)
             loss = criterion(output.squeeze(1).requires_grad_(), batch_labels)
-            w_loss = loss
+            w_loss = loss + 0 * grad_loss
             losses.append(loss)
             w_losses.append(w_loss)
             w_loss.backward()
