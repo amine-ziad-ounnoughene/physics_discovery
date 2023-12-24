@@ -2,18 +2,32 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 import torch.optim as optim
 from tools import *
-def prepare_data_loaders(dataset, n_equation, batch_size=50, equation_size=30):
-    x_train, y_train = data_prep(dataset, "train", n_equation, equation_size)
-    labels_train = standardize_tensor(torch.tensor(y_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
-    features_train = standardize_tensor(torch.tensor(x_train, dtype=torch.float32), labels_train)
-    train_dataset = TensorDataset(features_train, labels_train)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+def prepare_data_loaders(dataset, n_equation, batch_size=50, equation_size=30, scinet=False):
+    if scinet == False:
+        x_train, y_train = data_prep(dataset, "train", n_equation, equation_size)
+        labels_train = standardize_tensor(torch.tensor(y_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+        features_train = standardize_tensor(torch.tensor(x_train, dtype=torch.float32), labels_train)
+        train_dataset = TensorDataset(features_train, labels_train)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    x_test, y_test = data_prep(dataset, "test", n_equation, equation_size)
-    labels_test = standardize_tensor(torch.tensor(y_test, dtype=torch.float32), labels_train)
-    features_test = standardize_tensor(torch.tensor(x_test, dtype=torch.float32), labels_test)
-    test_dataset = TensorDataset(features_test, labels_test)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+        x_test, y_test = data_prep(dataset, "test", n_equation, equation_size)
+        labels_test = standardize_tensor(torch.tensor(y_test, dtype=torch.float32), labels_train)
+        features_test = standardize_tensor(torch.tensor(x_test, dtype=torch.float32), labels_test)
+        test_dataset = TensorDataset(features_test, labels_test)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    if scinet:
+        train_size = dataset.shape[0]
+        x_train, y_train = dataset.iloc[:int(train_size * 0.8), :-2].values, dataset.iloc[:int(train_size * 0.8), -1].values
+        labels_train = standardize_tensor(torch.tensor(y_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+        features_train = standardize_tensor(torch.tensor(x_train, dtype=torch.float32), labels_train)
+        train_dataset = TensorDataset(features_train, labels_train)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+        x_test, y_test = dataset.iloc[int(train_size * 0.8):, :-2].values, dataset.iloc[int(train_size * 0.8):, -1].values
+        labels_test = standardize_tensor(torch.tensor(y_test, dtype=torch.float32), labels_train)
+        features_test = standardize_tensor(torch.tensor(x_test, dtype=torch.float32), labels_test)
+        test_dataset = TensorDataset(features_test, labels_test)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     return train_loader, test_loader, features_train, labels_train, features_test, labels_test
 

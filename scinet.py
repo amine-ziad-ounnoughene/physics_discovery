@@ -56,7 +56,7 @@ class SciNet(nn.Module):
 		# print('latent_r: ', self.latent_r)
 		dec_input = torch.cat( (q, self.latent_r), 1)
 
-		return self.decoder(dec_input)
+		return dec_input, self.decoder(dec_input)
 
 
 def kl_divergence(means, log_sigma, dim, target_sigma=0.1):

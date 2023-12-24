@@ -21,7 +21,7 @@ def standardize_tensor(input_tensor, reference_tensor):
     
     normalized_tensor = (input_tensor - min_val) / (max_val - min_val + 1e-6)
     
-    return input_tensor
+    return normalized_tensor
 
 def decode(formula, x):
     for i in range(len(formula)):
@@ -147,10 +147,10 @@ def select(x, var, current_var,  bin=True):
             out = bin_(op, x)
         else:
             out = uni_(op, x)
-        if torch.isinf(out).any().item() or torch.isnan(out).any().item():
-            print(x)
-            print(op)
-            break
+        '''        if torch.isinf(out).any().item() or torch.isnan(out).any().item():
+                    print(x)
+                    print(op)
+                    break'''
         output_var = torch.cat((output_var, out.unsqueeze(1)), 1)
     output_var = output_var.unsqueeze(1).expand(-1, var, -1)
     return output_var, operations
