@@ -15,10 +15,10 @@ def generate_minimal_loss_formula(formuler,features, features_, labels, device, 
             op_ = [list(inner_tuple) for inner_tuple in op_]
             s.append(op_)
         formula_space.append(s)
-    
+    print(formula_space)
     losses = []
     for_ = []
-
+    o = 0
     for vector in tqdm(itertools.product(range(prob_size), repeat=sum(model[1:])), desc="Processing Vectors", unit="vector"):
         _f = [
             [
@@ -31,7 +31,11 @@ def generate_minimal_loss_formula(formuler,features, features_, labels, device, 
         loss_f = criterion(out.squeeze(1), labels.to(device)).detach().cpu()
         losses.append(float(loss_f))
         for_.append(_f)
-    
+        if o % 10000 == 0:
+            min_loss = min(losses)
+            print(min_loss)
+            print(for_[losses.index(min_loss)])
+        o += 1
     min_loss = min(losses)
     min_for = for_[losses.index(min_loss)]
     

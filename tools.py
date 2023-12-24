@@ -8,7 +8,10 @@ operators_uni = [
 operators_bin = ["+", "-", "*", "/"]
 
 
-
+operators_uni = [
+    "sin", "cos", "sqrt", "", "square", "zeroise", "pi", "g", "abs"
+]
+operators_bin = ["+", "-", "*"]
 
 
 
