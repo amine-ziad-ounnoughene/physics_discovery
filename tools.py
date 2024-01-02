@@ -8,10 +8,10 @@ operators_uni = [
 operators_bin = ["+", "-", "*", "/"]
 
 
-operators_uni = [
-    "sin", "cos", "sqrt", "", "square", "zeroise", "pi", "g", "abs"
+"""operators_uni = [
+    "sin", "cos", "sqrt", "", "square", "zeroise", "abs"
 ]
-operators_bin = ["+", "-", "*"]
+operators_bin = ["+", "-", "*"]"""
 
 
 
@@ -147,10 +147,11 @@ def select(x, var, current_var,  bin=True):
             out = bin_(op, x)
         else:
             out = uni_(op, x)
-        '''        if torch.isinf(out).any().item() or torch.isnan(out).any().item():
+        if torch.isinf(out).any().item() or torch.isnan(out).any().item():
                     print(x)
+                    print("inf ", torch.isinf(out).any().item())
                     print(op)
-                    break'''
+                    break
         output_var = torch.cat((output_var, out.unsqueeze(1)), 1)
     output_var = output_var.unsqueeze(1).expand(-1, var, -1)
     return output_var, operations
@@ -177,6 +178,7 @@ def real_grad(x):
     # The gradient of A with respect to C
     grad_ = x.grad
     return grad_
+
 def compute_gradient_last_to_first(model, input_data):
     input_data.requires_grad = True  # Set requires_grad to True to compute gradients
     output, _ = model(input_data)
