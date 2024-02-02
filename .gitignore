@@ -1,2 +1,6 @@
-*.pth
+*.dat
+*.pdf
+*.png
+*.csv
 *.pyc
+*.pth
